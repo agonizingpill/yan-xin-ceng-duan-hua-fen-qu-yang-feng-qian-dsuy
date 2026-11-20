@@ -2,7 +2,7 @@ import json
 import numpy as np
 from sqlalchemy import select
 from src.database import Session,Base,engine
-from src.models import User,Borehole,CoreRun,Reading,MissingInterval,Interpretation,Stratum,SampleInterval,Seal,Custody,ColumnRevision
+from src.models import User,Borehole,CoreRun,Reading,MissingInterval,Interpretation,Stratum,SampleInterval,Seal,Custody,SampleReturn,ColumnRevision
 from src.security import password_hash
 
 def seed():
@@ -22,5 +22,9 @@ def seed():
                     s.add(Reading(borehole_id=h.id,run_id=run.id,depth_m=float(depth),density=round(float(center[0]+rng.normal(0,.035)),4),susceptibility=round(float(center[1]+rng.normal(0,1.5)),4),velocity=round(float(center[2]+rng.normal(0,55)),3)))
             s.add(MissingInterval(borehole_id=h.id,start_m=12,end_m=13,state='observed',reason=''))
             legacy=Interpretation(borehole_id=h.id,state='historical',evidence={'note':'旧纸本区间来源，仅保留既有切样，不替代新GMM解释'});s.add(legacy);s.flush();st=Stratum(interpretation_id=legacy.id,start_m=0,end_m=12,lithology='旧编录砂岩',contact_note='纸本编录回录，仅保留历史取样依据');s.add(st);s.flush();sample=SampleInterval(borehole_id=h.id,stratum_id=st.id,code='CS-031-OLD',start_m=8,end_m=9,purpose='历史抗压试验',destructive=True,state='broken');s.add(sample);s.flush();s.add(Seal(sample_id=sample.id,code='CX031-001',state='broken',reason='运输交接发现铅封裂口，待现场核样重封',sealed_by='operator@liheng.local',snapshot={'code':sample.code,'start_m':8,'end_m':9,'source':'历史纸本'}))
-    with Session()as s:return {cls.__tablename__:len(s.scalars(select(cls)).all())for cls in [User,Borehole,CoreRun,Reading,MissingInterval,Interpretation,Stratum,SampleInterval,Seal,Custody,ColumnRevision]}
+            his2=SampleInterval(borehole_id=h.id,stratum_id=st.id,code='CS-031-HIS2',start_m=4,end_m=5,purpose='历史含水率试验',destructive=True,state='transferred');s.add(his2);s.flush()
+            seal2=Seal(sample_id=his2.id,code='CX031-002',state='intact',reason='',sealed_by='operator@liheng.local',snapshot={'code':his2.code,'start_m':4,'end_m':5,'source':'历史纸本'});s.add(seal2);s.flush()
+            cust=Custody(seal_id=seal2.id,receiver='周岩 / 实验室收样员',destination='砾衡岩土试验室',condition='双方核对样号、孔深及铅封完整，样袋干燥无漏失',at='2026-11-18T09:30:00+00:00');s.add(cust);s.flush()
+            s.add(SampleReturn(borehole_id=h.id,sample_id=his2.id,custody_id=cust.id,reason='化验室开袋发现岩芯受潮散碎，无法完成含水率试验，退回原袋申请原层等长补取',state='pending',created_by='supervisor@liheng.local',created_at='2026-11-19T08:00:00+00:00',evidence={}))
+    with Session()as s:return {cls.__tablename__:len(s.scalars(select(cls)).all())for cls in [User,Borehole,CoreRun,Reading,MissingInterval,Interpretation,Stratum,SampleInterval,Seal,Custody,SampleReturn,ColumnRevision]}
 if __name__=='__main__':print(json.dumps(seed(),ensure_ascii=False))

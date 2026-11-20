@@ -13,7 +13,7 @@ docker compose up -d --build --wait
 
 三个账号为 `operator@liheng.local`、`supervisor@liheng.local`、`viewer@liheng.local`，口令均为 `Core2026!`。operator 编录、申请切样、封签交接、编制草稿；supervisor 另可确认层面、撤回解释、报告破签、冻结版本；viewer 只读，后端独立拒绝所有写入。
 
-## 六个业务模块
+## 七个业务模块
 
 | 模块 | 领域规则与状态 |
 |---|---|
@@ -22,9 +22,10 @@ docker compose up -d --build --wait
 | 层段候选与人工接触面 | Interpretation queued→ready/failed→confirmed；人工层段从孔口连续到终孔、每层附依据；一孔只能一份已确认解释 |
 | 取样配额与区间冲突 | SampleInterval 必须落在同一已确认层，不穿缺段；破坏性切样不可重叠且合计不超孔配额；planned 可改或取消，封签后不可改 |
 | 样袋封签及交接 | planned→sealed→transferred；破签转 broken，只能带原因重封；Seal.previous_id 保存旧链，Custody 只接收当前完整封签且一次一回执 |
+| 退样补取与原层等长 | SampleReturn pending→fulfilled/cancelled；仅已签收样袋可退；按原袋与余段三项物性分布距离推荐最接近段，缺芯或缺可比读数不推荐；被占或配额不足留待补取且原袋额度照计；撤单与补取先办成为准；补取幂等不重复开样扣额 |
 | 柱状图版本冻结 | draft→frozen；检查进尺、每米中心测点或明示缺段、缺段说明、层面、所有有效样品交接；冻结保存完整快照并关闭整孔写入 |
 
-取样与配额写入、封签、交接、冻结统一先锁父钻孔，数据库唯一约束作为补充。并发验收主动持有父锁，让两次请求确实竞争，避免仅顺序调用。
+取样与配额写入、封签、交接、退单补取与撤单、冻结统一先锁父钻孔，数据库唯一约束作为补充。并发验收主动持有父锁，让两次请求确实竞争，避免仅顺序调用。
 
 ## 演示一天
 
@@ -34,8 +35,9 @@ docker compose up -d --build --wait
 4. 在第一层申请 2–3m 切样；8.5–9.5m 与历史 8–9m 切样冲突会被拒绝。改区间后恢复。
 5. 旧封签 CX031-001 已破签，不能移交；填原因重封并保持 previous_id，再登记实验室接收人、目的地、完整性。
 6. 新样封签后不再允许改区间。主管报告破签后，重新封签、重新交接，历史回执不被覆盖。
-7. 建柱状图草稿；未说明缺芯或未交接样品会阻止冻结，补说明/补交接后可重试同一草稿。
-8. 冻结版本查看孔深、人工岩性、缺芯带与样品标记；快照保留测点、模型证据、全部封签及交接链。
+7. 已签收的 CS-031-HIS2 被化验室退回：封签页登记退样理由生成退单；切样页查看候选段按三项物性分布距离排序，缺芯与缺读数段不推荐；补取最接近段生成等长补样，从补样可查原袋回执、退样理由和相似依据；退单未补成可撤，撤单与补取并发以先办成为准，中断重试不重复开样或扣额。
+8. 建柱状图草稿；未说明缺芯或未交接样品会阻止冻结，补说明/补交接后可重试同一草稿。
+9. 冻结版本查看孔深、人工岩性、缺芯带与样品标记；快照保留测点、模型证据、全部封签及交接链。
 
 ## 真实 Python 算法
 
@@ -45,7 +47,7 @@ worker 经 Redis 队列执行 `layer_model.py`。密度、磁化率、声速先�
 
 ## 结构和开发
 
-`backend/src/models.py` 定义关系表；`schemas.py` 提供严格校验与非有限值拒绝；五个领域 service 承担约束；`routes.py` 管接口与角色；`layer_model.py` / `worker.py` 管计算；`common.py` 管父锁与审计。`middlewares.py` 提供请求追踪及异常恢复两层中间件。`frontend/src/pages/` 六页分别实现领域任务，`components/logbook.js` 共用孔头、深度带、徽标等组件，`constants.js` 集中角色和状态，`utils/` 管请求及转义。原生 HTML/CSS/ES modules，无前端框架。
+`backend/src/models.py` 定义关系表；`schemas.py` 提供严格校验与非有限值拒绝；六个领域 service 承担约束；`routes.py` 管接口与角色；`layer_model.py` / `worker.py` 管计算；`common.py` 管父锁与审计。`middlewares.py` 提供请求追踪及异常恢复两层中间件。`frontend/src/pages/` 六页分别实现领域任务，`components/logbook.js` 共用孔头、深度带、徽标等组件，`constants.js` 集中角色和状态，`utils/` 管请求及转义。原生 HTML/CSS/ES modules，无前端框架。退样补取的候选评估与幂等补取在 `return_service.py`，接口测试在 `backend/tests/`。
 
 ```bash
 docker compose exec -T backend python /app/scripts/seed_demo.py

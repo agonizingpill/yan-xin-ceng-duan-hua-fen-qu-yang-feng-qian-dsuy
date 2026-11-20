@@ -97,6 +97,20 @@ class Custody(Base):
     destination:Mapped[str]=mapped_column(String(120))
     condition:Mapped[str]=mapped_column(String(300))
     at:Mapped[str]=mapped_column(String(40))
+class SampleReturn(Base):
+    __tablename__='sample_returns'
+    __table_args__=(UniqueConstraint('replacement_id'),)
+    id:Mapped[int]=mapped_column(primary_key=True)
+    borehole_id:Mapped[int]=mapped_column(ForeignKey('boreholes.id'))
+    sample_id:Mapped[int]=mapped_column(ForeignKey('sample_intervals.id'))
+    custody_id:Mapped[int|None]=mapped_column(ForeignKey('custodies.id'),nullable=True)
+    reason:Mapped[str]=mapped_column(String(600))
+    state:Mapped[str]=mapped_column(String(20),default='pending')
+    replacement_id:Mapped[int|None]=mapped_column(ForeignKey('sample_intervals.id'),nullable=True)
+    evidence:Mapped[dict]=mapped_column(JSON,default=dict)
+    created_by:Mapped[str]=mapped_column(String(120))
+    created_at:Mapped[str]=mapped_column(String(40))
+    closed_at:Mapped[str]=mapped_column(String(40),default='')
 class ColumnRevision(Base):
     __tablename__='column_revisions'
     __table_args__=(UniqueConstraint('borehole_id','version'),)

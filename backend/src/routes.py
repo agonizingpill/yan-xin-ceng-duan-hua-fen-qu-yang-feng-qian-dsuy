@@ -3,14 +3,14 @@ from sqlalchemy import select
 from .database import Session
 from .security import current,allow
 from .common import pack,audit,hole
-from .models import Borehole,CoreRun,Reading,MissingInterval,Interpretation,Stratum,SampleInterval,Seal,Custody,ColumnRevision,Audit
-from .schemas import HoleInput,RunInput,ReadingInput,MissingInput,Reason,BoreholeRef,Layers,SampleInput,SealInput,CustodyInput,RevisionInput
-from . import drilling_service as drilling,strata_service as strata,sample_service as sampling,custody_service as custody,revision_service as revision
+from .models import Borehole,CoreRun,Reading,MissingInterval,Interpretation,Stratum,SampleInterval,Seal,Custody,SampleReturn,ColumnRevision,Audit
+from .schemas import HoleInput,RunInput,ReadingInput,MissingInput,Reason,BoreholeRef,Layers,SampleInput,SealInput,CustodyInput,ReturnInput,ResampleInput,RevisionInput
+from . import drilling_service as drilling,strata_service as strata,sample_service as sampling,custody_service as custody,return_service as returns,revision_service as revision
 router=APIRouter()
 def permissions(u,controlled=False):allow(u,*(['supervisor']if controlled else['operator','supervisor']))
 @router.get('/register')
 def register(u=Depends(current)):
-    with Session()as s:return {name:[pack(x)for x in s.scalars(select(cls).order_by(cls.id))]for name,cls in [('boreholes',Borehole),('runs',CoreRun),('readings',Reading),('missing',MissingInterval),('interpretations',Interpretation),('strata',Stratum),('samples',SampleInterval),('seals',Seal),('custodies',Custody),('revisions',ColumnRevision)]}
+    with Session()as s:return {name:[pack(x)for x in s.scalars(select(cls).order_by(cls.id))]for name,cls in [('boreholes',Borehole),('runs',CoreRun),('readings',Reading),('missing',MissingInterval),('interpretations',Interpretation),('strata',Stratum),('samples',SampleInterval),('seals',Seal),('custodies',Custody),('returns',SampleReturn),('revisions',ColumnRevision)]}
 @router.get('/audit')
 def history(u=Depends(current)):
     with Session()as s:return [pack(x)for x in s.scalars(select(Audit).order_by(Audit.id.desc()).limit(35))]
@@ -89,6 +89,21 @@ def broken(id:int,p:Reason,u=Depends(current)):
 def handover(p:CustodyInput,u=Depends(current)):
     permissions(u)
     with Session.begin()as s:return custody.handover(s,p,u)
+@router.post('/returns')
+def new_return(p:ReturnInput,u=Depends(current)):
+    permissions(u)
+    with Session.begin()as s:return returns.create(s,p,u)
+@router.get('/returns/{id}/candidates')
+def ret_candidates(id:int,u=Depends(current)):
+    with Session()as s:return returns.candidates(s,id)
+@router.post('/returns/{id}/resample')
+def ret_resample(id:int,p:ResampleInput,u=Depends(current)):
+    permissions(u)
+    with Session.begin()as s:return returns.resample(s,id,p,u)
+@router.post('/returns/{id}/cancel')
+def ret_cancel(id:int,u=Depends(current)):
+    permissions(u)
+    with Session.begin()as s:return returns.cancel(s,id,u)
 @router.post('/revisions')
 def new_revision(p:RevisionInput,u=Depends(current)):
     permissions(u)

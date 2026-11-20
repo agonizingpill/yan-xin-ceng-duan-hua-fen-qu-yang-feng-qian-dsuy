@@ -49,6 +49,10 @@ class CustodyInput(Clean):
     receiver:str=Field(min_length=2,max_length=100)
     destination:str=Field(min_length=2,max_length=120)
     condition:str=Field(min_length=8,max_length=300)
+class ReturnInput(Clean):
+    sample_id:int
+    reason:str=Field(min_length=8,max_length=600)
+class ResampleInput(Clean):start_m:float|None=None
 class RevisionInput(Clean):
     borehole_id:int
     version:str=Field(min_length=2,max_length=40)
